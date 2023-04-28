@@ -46,7 +46,7 @@ void loop() {
   digitalWrite(trigPin, LOW);
 
   duration = pulseIn(echoPin, HIGH);
-  distance = (duration*.0343)/2;
+  distance = (duration * .0343) / 2;
 
   if (distance < 15) {
     turn();
@@ -61,7 +61,7 @@ void loop() {
       smooth_left();
     } else if (IR_L_data == 0 and IR_M_data == 1 and IR_R_data == 1) {
       smooth_right();
-    } else if (IR_L_data == 1 and IR_R_data == 1){
+    } else if (IR_L_data == 1 and IR_R_data == 1) {
       stop();
     }
   }
@@ -117,7 +117,7 @@ void turn() {
   milliright(500);
   milliforward(1500);
   milliright(500);
-  milliforward(1000);
+  milliforward(700);
   millilastforward();
 }
 
@@ -153,14 +153,17 @@ void milliforward(unsigned long x) {
     hardforward();
   }
 }
-void millilastforward(){
-  forward();
-  if (IR_L_data == 1 or IR_M_data == 1 or IR_R_data == 1) {
-    stop();
-    //millilastleft(200);
+void millilastforward() {
+  while (IR_L_data == 0 and IR_L_data == 0 and IR_L_data == 0) {
+    forward();
+    if (IR_L_data == 1 or IR_M_data == 1 or IR_R_data == 1) {
+      stop();
+      break;
+    }
   }
+  millilastleft(200);
 }
-void millilastleft(unsigned long x){
+void millilastleft(unsigned long x) {
   unsigned long current_time = millis();
   unsigned long interval = x;
   while (millis() - current_time < interval) {
