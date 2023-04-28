@@ -14,6 +14,8 @@
 - Python 3.11
 - Visual Studio Code
 - PyCharm
+- Android Studio
+- Java
 - openCV 라이브러리
 - YOLOv5 객체 탐지 모델
 - DRGO 웹캠
