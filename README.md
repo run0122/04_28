@@ -49,6 +49,177 @@
 # 작업시간
 33시간
 
+# 주요 코드
+
+## Arduino
+```
+void loop() {
+  //IR 센서 값을 읽어 출력해주는 코드
+  // IR_L_data = analogRead(IR_L);
+  // IR_M_data = analogRead(IR_M);
+  // IR_R_data = analogRead(IR_R);
+  IR_L_data = digitalRead(IR_L);
+  IR_M_data = digitalRead(IR_M);
+  IR_R_data = digitalRead(IR_R);
+
+  // Serial.println((String)IR_L_data +"-"+IR_M_data+"-"+IR_R_data);
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+  distance = (duration * .0343) / 2;
+
+  if (distance < 15) {
+    turn();
+  } else {
+    if (IR_L_data == 0 and IR_M_data == 1 and IR_R_data == 0) {
+      forward();
+    } else if (IR_L_data == 1 and IR_M_data == 0 and IR_R_data == 0) {
+      left();
+    } else if (IR_L_data == 0 and IR_M_data == 0 and IR_R_data == 1) {
+      right();
+    } else if (IR_L_data == 1 and IR_M_data == 1 and IR_R_data == 0) {
+      smooth_left();
+    } else if (IR_L_data == 0 and IR_M_data == 1 and IR_R_data == 1) {
+      smooth_right();
+    } else if (IR_L_data == 1 and IR_R_data == 1) {
+      stop();
+    }
+  }
+}
+
+void turn() {
+  millifirstleft(500);
+  milliforward(1200);
+  milliright(500);
+  milliforward(1500);
+  milliright(500);
+  milliforward(700);
+  millilastforward();
+}
+
+void milliright(unsigned long x) {
+  unsigned long current_time = millis();
+  unsigned long interval = x;
+  while (millis() - current_time < interval) {
+    hardright();
+  }
+}
+
+void millilastforward() {
+  while (IR_L_data == 0 and IR_L_data == 0 and IR_L_data == 0) {
+    forward();
+    if (IR_L_data == 1 or IR_M_data == 1 or IR_R_data == 1) {
+      stop();
+      break;
+    }
+  }
+  millilastleft(200);
+}
+
+void millilastleft(unsigned long x) {
+  unsigned long current_time = millis();
+  unsigned long interval = x;
+  while (millis() - current_time < interval) {
+    hardleft();
+  }
+  left();
+  if (IR_L_data == 1 or IR_M_data == 1 or IR_R_data == 1) {
+    return;
+  }
+}
+```
+
+## Python
+### 1.
+```
+import cv2
+import numpy as np
+import torch
+import serial
+
+ser = serial.Serial('COM4', 9600)
+
+model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+
+cap = cv2.VideoCapture(0)  # 0번 카메라 연결
+
+person_detected = False  # person 객체가 감지되었는지 여부를 저장하는 변수
+
+while True:
+    ret, frame = cap.read()  # 프레임 읽기
+    if not ret:
+        break
+    results = model(frame)  # 객체 감지 수행
+
+    for detection in results.xyxy[0]:
+        # 객체의 위치와 클래스 정보를 가져옵니다.
+        x1, y1, x2, y2, conf, cls = detection
+        label = model.names[int(cls)]
+
+        # person 객체일 때만 그리기
+        if label == 'person':
+            person_detected = True  # person 객체가 감지되었다고 표시
+            # 객체의 위치에 사각형을 그려줍니다.
+            cv2.rectangle(frame, (int(x1), int(y1)),
+                          (int(x2), int(y2)), (0, 255, 0), 2)
+            # 객체의 클래스 이름과 정확도를 화면에 출력합니다.
+            cv2.putText(frame, f'{label} {conf:.2f}', (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                        (0, 255, 0), 2)
+```
+### 2.
+```
+    # 하단부 중앙 1/2 영역 추출하기
+    crop_width = int(width / 4)
+    crop_height = int(height / 2)
+    start_x = int(width / 2) - crop_width
+    start_y = int(height / 2)
+    end_x = int(width / 2) + crop_width
+    end_y = height
+    cropped_frame = frame[start_y:end_y, start_x:end_x]
+
+    # 그레이스케일 이미지로 변환하기
+    gray = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
+
+    # 이미지 이진화하기
+    _, thresh = cv2.threshold(gray, 90, 255, cv2.THRESH_BINARY_INV)
+
+    # 컨투어 찾기
+    contours, _ = cv2.findContours(
+        thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area > max_area and area > min_contour_area:
+            max_area = area
+            max_contour = contour
+
+    # 가장 큰 영역의 중심점 찾기
+    if max_contour is not None:
+        M = cv2.moments(max_contour)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+
+            # 중심점 그리기
+            cv2.circle(thresh, (cx, cy), 5, (0, 0, 255), -1)
+
+            # 중심점 정보 시리얼 통신으로 전송하기
+            if cx < 140:
+                print('L')
+                ser.write(b'L')
+            elif cx > 180:
+                print('R')
+                ser.write(b'R')
+            else:
+                print('F')
+                ser.write(b'F')
+```
+
 # 데모 영상 시연
 
 # 알려진 이슈
